@@ -35,6 +35,12 @@ sudo systemctl enable --now palisade
 ./palisade -h
 ```
 
+## Support
+
+<a href="https://trakteer.id/ahmad435" target="_blank">
+  <img src="https://cdn.trakteer.id/images/mix/coffee.png" alt="Traktir Kopi di Trakteer" />
+</a>
+
 ## License
 
 Palisade is a fork of [Jigsaw-Code/Intra](https://github.com/Jigsaw-Code/Intra) and is licensed under **Apache 2.0**.
