@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Palisade — DNS-over-HTTPS</title>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --card: #111118;
+  --card2: #16161f;
+  --border: #1e1e2e;
+  --text: #cdd6f4;
+  --muted: #6c7086;
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --red: #f38ba8;
+  --yellow: #f9e2af;
+  --accent: #cba6f7;
+  --radius: 12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:24px 16px 48px;background-image:radial-gradient(ellipse at 50% 0%,#1e1e2e20 0%,transparent 60%)}
+.container{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#89b4fa,#cba6f7);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px #cba6f740}
+.logo-text{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.logo-ver{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}
+
+/* Status pill */
+.status{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:24px;border:1px solid var(--border);background:var(--card);font-size:13px;font-weight:500}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:all .3s}
+.status-dot.on{background:var(--green);box-shadow:0 0 6px #a6e3a160;animation:pulse 2s infinite}
+.status-dot.off{background:var(--red);box-shadow:0 0 6px #f38ba840}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .2s}
+.card:hover{border-color:#2e2e44}
+.card-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.card-body{padding:18px}
+
+/* Controls */
+.controls{display:flex;gap:10px}
+.btn{flex:1;padding:12px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;letter-spacing:.2px}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-start{background:linear-gradient(135deg,#a6e3a1,#74c77a);color:#0a0a0f}
+.btn-start:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 16px #a6e3a130}
+.btn-stop{background:linear-gradient(135deg,#f38ba8,#e06982);color:#0a0a0f}
+.btn-stop:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 16px #f38ba830}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{background:var(--card2);border-color:#3e3e5e}
+.btn-sm{padding:8px 14px;font-size:12px;border-radius:6px}
+
+/* Stats grid */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px}
+.stat{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.stat-val{font-size:22px;font-weight:700;letter-spacing:-.5px;line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:6px}
+.stat.good .stat-val{color:var(--green)}
+.stat.bad .stat-val{color:var(--red)}
+
+/* Config */
+.config-row{display:flex;gap:8px}
+.config-row select,.config-row input{flex:1;padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;transition:border-color .2s}
+.config-row select:focus,.config-row input:focus{outline:none;border-color:var(--blue)}
+
+/* Chart */
+.chart-wrap{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 12px 4px;height:150px}
+.chart-wrap svg{width:100%;height:100%}
+
+/* Probe */
+.probe-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.probe-item:last-child{border-bottom:none}
+.probe-rank{width:18px;height:18px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--muted);flex-shrink:0}
+.probe-rank.top{background:#cba6f720;color:var(--accent)}
+.probe-name{flex:1;font-size:13px}
+.probe-url{font-size:11px;color:var(--muted)}
+.probe-badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.probe-ok{background:#a6e3a115;color:var(--green)}
+.probe-fail{background:#f38ba815;color:var(--red)}
+
+/* Log table */
+.log-table{width:100%;font-size:12px;border-collapse:collapse}
+.log-table th{text-align:left;color:var(--muted);padding:8px 10px;font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.log-table td{padding:7px 10px;border-top:1px solid var(--border);font-family:'JetBrains Mono','Fira Code',monospace;transition:background .1s}
+.log-table tr:hover td{background:var(--card2)}
+.log-table .domain{color:var(--blue)}
+.log-table .ok{color:var(--green)}
+.log-table .err{color:var(--red)}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border)}
+.tab{padding:10px 18px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* Uptime anim */
+.uptime{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.uptime-blip{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* Responsive */
+@media(max-width:500px){
+  body{padding:12px 8px 32px}
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .controls{flex-direction:column}
+  .config-row{flex-direction:column}
+  .header{flex-wrap:wrap;gap:8px}
+}
+
+.empty-state{text-align:center;padding:32px 16px;color:var(--muted)}
+.empty-state svg{margin-bottom:12px;opacity:.4}
+.empty-state p{font-size:13px;margin-top:4px}
+
+.tooltip{position:relative}
+.fade{transition:opacity .3s}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0f" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <span class="logo-text">Palisade <span class="logo-ver">v1.0</span></span>
+    </div>
+    <div class="status">
+      <div class="status-dot off" id="statusDot"></div>
+      <span id="statusText">Stopped</span>
+      <span class="uptime" id="statusUptime" style="display:none"><span class="uptime-blip"></span><span id="uptimeVal"></span></span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card">
+    <div class="card-body">
+      <div class="controls" style="margin-bottom:16px">
+        <button class="btn btn-start" id="btnStart" onclick="startTunnel()">Start Tunnel</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopTunnel()" disabled>Stop</button>
+      </div>
+      <div class="config-row">
+        <select id="dohPreset" onchange="onPresetChange()">
+          <option value="https://cloudflare-dns.com/dns-query">Cloudflare</option>
+          <option value="https://dns.google/dns-query">Google</option>
+          <option value="https://dns.quad9.net/dns-query">Quad9</option>
+          <option value="https://doh.opendns.com/dns-query">OpenDNS</option>
+          <option value="https://doh.mullvad.net/dns-query">Mullvad</option>
+          <option value="https://dns.nextdns.io">NextDNS</option>
+          <option value="custom">Custom URL...</option>
+        </select>
+        <input type="text" id="dohUrl" value="https://cloudflare-dns.com/dns-query" style="display:none" placeholder="https://...">
+        <button class="btn btn-outline btn-sm" onclick="saveConfig()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="statQueries">0</div><div class="stat-lbl">Queries</div></div>
+    <div class="stat good"><div class="stat-val" id="statSuccess">0</div><div class="stat-lbl">Success</div></div>
+    <div class="stat bad"><div class="stat-val" id="statFail">0</div><div class="stat-lbl">Failed</div></div>
+    <div class="stat"><div class="stat-val" id="statLatency">—</div><div class="stat-lbl">Avg Latency</div></div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card">
+    <div class="card-header">Latency History</div>
+    <div class="chart-wrap">
+      <svg id="chart" viewBox="0 0 640 130">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#89b4fa" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="#89b4fa" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path id="chartFill" fill="none"/>
+        <polyline id="chartLine" fill="none" stroke="#89b4fa" stroke-width="2"/>
+        <line id="chartAvg" x1="0" y1="0" x2="640" y2="0" stroke="#a6e3a1" stroke-width="1" stroke-dasharray="4,3" style="display:none"/>
+        <text id="chartAvgLabel" x="640" y="0" fill="#a6e3a1" font-size="10" text-anchor="end" style="display:none"/>
+        <g id="chartDots"></g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Tabs: Probe / Log -->
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('probe',this)">Server Probe</div>
+      <div class="tab" onclick="switchTab('log',this)">Query Log</div>
+    </div>
+    <div class="card-body" id="tabProbe">
+      <div class="probe-list" id="probeList">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <p>Test latency to all DoH servers</p>
+          <button class="btn btn-outline btn-sm" onclick="runProbe()" style="margin-top:12px">Run Probe</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" id="tabLog" style="display:none;max-height:360px;overflow-y:auto">
+      <table class="log-table">
+        <thead><tr><th>Time</th><th>Domain</th><th>Server</th><th>Latency</th><th>Status</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+      <div class="empty-state" id="logEmpty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><p>No queries yet</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let activeTab = 'probe';
+
+function api(p, m='GET', b=null) {
+  const o = {method:m, headers:{}};
+  if(b) { o.headers['Content-Type']='application/json'; o.body=JSON.stringify(b); }
+  return fetch('/api'+p, o).then(r => r.json()).catch(() => null);
+}
+
+async function refresh() {
+  const s = await api('/status');
+  if(!s) return;
+
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const up = document.getElementById('statusUptime');
+  const bs = document.getElementById('btnStart');
+  const bp = document.getElementById('btnStop');
+
+  if(s.running) {
+    dot.className = 'status-dot on';
+    txt.textContent = 'Running';
+    up.style.display = '';
+    document.getElementById('uptimeVal').textContent = s.uptime || '';
+    bs.disabled = true; bp.disabled = false;
+  } else {
+    dot.className = 'status-dot off';
+    txt.textContent = 'Stopped';
+    up.style.display = 'none';
+    bs.disabled = false; bp.disabled = true;
+  }
+
+  document.getElementById('statQueries').textContent = s.query_count||0;
+  document.getElementById('statSuccess').textContent = s.success_count||0;
+  document.getElementById('statFail').textContent = s.fail_count||0;
+  document.getElementById('statLatency').textContent = s.avg_latency_ms ? s.avg_latency_ms.toFixed(1)+'ms' : '—';
+
+  const url = s.doh_url || 'https://cloudflare-dns.com/dns-query';
+  const sel = document.getElementById('dohPreset');
+  const inp = document.getElementById('dohUrl');
+  let found = false;
+  for(let o of sel.options) if(o.value === url) { sel.value = url; inp.style.display='none'; found = true; break; }
+  if(!found) { sel.value = 'custom'; inp.style.display = 'block'; inp.value = url; }
+
+  const entries = await api('/log');
+  renderLog(entries);
+  renderChart(entries);
+}
+
+function renderLog(entries) {
+  const body = document.getElementById('logBody');
+  const empty = document.getElementById('logEmpty');
+  if(!entries || !entries.length) { body.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  body.innerHTML = entries.slice(-80).reverse().map(e =>
+    `<tr><td>${e.time.slice(11,19)}</td><td class="domain">${esc(e.domain)}</td><td>${esc((e.server||'').slice(0,15))}</td><td>${e.latency_ms?e.latency_ms.toFixed(1)+'ms':''}</td><td class="${e.success?'ok':'err'}">${esc(e.status)}</td></tr>`
+  ).join('');
+}
+
+function renderChart(entries) {
+  if(!entries || entries.length < 2) return;
+  const last = entries.slice(-60);
+  const maxLat = Math.max(...last.map(e => e.latency_ms||0), 20);
+  const avg = last.reduce((s,e) => s+(e.latency_ms||0), 0) / last.length;
+  const W = 640, H = 130, pad = [20, 15, 30, 15]; // top right bottom left
+  const cw = W - pad[3] - pad[1];
+  const ch = H - pad[0] - pad[2];
+  const ys = d => pad[0] + ch - ((d/maxLat) * ch);
+
+  // Fill area
+  let pts = `${pad[3]},${pad[0]+ch} `;
+  last.forEach((e,i) => { const x = pad[3] + (i/(last.length-1))*cw; pts += x.toFixed(1)+','+ys(e.latency_ms||0).toFixed(1)+' '; });
+  pts += `${pad[3]+cw},${pad[0]+ch}`;
+  document.getElementById('chartFill').setAttribute('d', 'M'+pts.trim()+'Z');
+  document.getElementById('chartFill').setAttribute('fill', 'url(#lineGrad)');
+
+  // Line
+  const linePts = last.map((e,i) => (pad[3]+(i/(last.length-1))*cw).toFixed(1)+','+ys(e.latency_ms||0).toFixed(1)).join(' ');
+  document.getElementById('chartLine').setAttribute('points', linePts);
+
+  // Dots (only for notable points)
+  let dots = '';
+  last.forEach((e,i) => {
+    if(i<5 || i>=last.length-5 || e.latency_ms > avg*1.8 || !e.success) {
+      const x = pad[3] + (i/(last.length-1))*cw;
+      const y = ys(e.latency_ms||0);
+      const c = e.success ? '#89b4fa' : '#f38ba8';
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${c}"><title>${esc(e.domain)}: ${(e.latency_ms||0).toFixed(1)}ms ${e.success?'OK':'FAIL'}</title></circle>`;
+    }
+  });
+  document.getElementById('chartDots').innerHTML = dots;
+
+  // Avg line
+  const ay = ys(avg);
+  document.getElementById('chartAvg').style.display = '';
+  document.getElementById('chartAvg').setAttribute('y1', ay); document.getElementById('chartAvg').setAttribute('y2', ay);
+  document.getElementById('chartAvgLabel').style.display = '';
+  document.getElementById('chartAvgLabel').setAttribute('y', ay-4); document.getElementById('chartAvgLabel').textContent = avg.toFixed(0)+'ms avg';
+}
+
+async function runProbe() {
+  const list = document.getElementById('probeList');
+  list.innerHTML = '<div class="empty-state"><p style="opacity:.7">Testing all servers...</p></div>';
+  const r = await api('/probe');
+  if(!r) return;
+  list.innerHTML = r.map((s,i) =>
+    `<div class="probe-item">
+      <div class="probe-rank${i===0&&s.ok?' top':''}">${i+1}</div>
+      <div class="probe-name">${esc(s.name)}<div class="probe-url">${esc(s.url)}</div></div>
+      <div class="probe-badge ${s.ok?'probe-ok':'probe-fail'}">${s.ok?s.latency_ms.toFixed(1)+'ms':esc(s.error||'Error')}</div>
+    </div>`
+  ).join('');
+}
+
+function switchTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tabProbe').style.display = tab==='probe'?'':'none';
+  document.getElementById('tabLog').style.display = tab==='log'?'':'none';
+}
+
+function startTunnel() { api('/start','POST').then(refresh); }
+function stopTunnel() { api('/stop','POST').then(refresh); }
+
+function saveConfig() {
+  const url = document.getElementById('dohPreset').value === 'custom'
+    ? document.getElementById('dohUrl').value : document.getElementById('dohPreset').value;
+  api('/config','POST',{doh_url:url}).then(refresh);
+}
+
+function onPresetChange() {
+  const s = document.getElementById('dohPreset');
+  const i = document.getElementById('dohUrl');
+  if(s.value==='custom'){i.style.display='block';i.focus()}else{i.style.display='none';i.value=s.value}
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+<div style="text-align:center;padding:16px;font-size:11px;color:var(--muted)">
+  Palisade is a fork of <a href="https://github.com/Jigsaw-Code/Intra" style="color:var(--blue);text-decoration:none" target="_blank">Jigsaw-Code/Intra</a> · Apache 2.0
+</div>
+</body>
+</html>

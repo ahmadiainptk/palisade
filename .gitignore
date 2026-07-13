@@ -1,0 +1,12 @@
+# Binary
+intra-linux
+
+# Go
+*.exe
+*.test
+*.out
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db
