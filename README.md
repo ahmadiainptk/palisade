@@ -37,9 +37,11 @@ sudo systemctl enable --now palisade
 
 ## Support
 
-<a href="https://trakteer.id/ahmad435" target="_blank">
-  <img src="https://cdn.trakteer.id/images/mix/coffee.png" alt="Traktir Kopi di Trakteer" />
-</a>
+<p align="center">
+  <a href="https://trakteer.id/ahmad435" target="_blank">
+    <img src="https://cdn.trakteer.id/images/embed/trbtn-red-5.png" height="40" alt="Traktir Kopi" />
+  </a>
+</p>
 
 ## License
 
